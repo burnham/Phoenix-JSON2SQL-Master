@@ -1,0 +1,48 @@
+﻿# Professional .gitignore for Phoenix SQL Importer
+# -----------------------------------------------
+
+# Build artifacts & compilation
+build/
+dist/
+*.spec
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Executables & Scripts
+*.exe
+*.bat
+
+# Development tools (not part of the project)
+sanitize.py
+
+# Logs
+logs/
+*.log
+
+# SQL Exports
+exports/
+*.sql
+
+# Backups
+BACKUPS/
+backups/
+
+# Documentation (until README is complete)
+Docs/
+
+# Virtual environments
+.venv/
+venv_build/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

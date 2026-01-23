@@ -186,10 +186,6 @@ def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callbac
         log(f"[*] Exporting SQL Script to: {export_path}...")
         try:
             sql_content = generate_sql_script(df, table_name, mode, pk_field)
-            # Create directory if it doesn't exist
-            export_dir = os.path.dirname(export_path)
-            if export_dir:
-                os.makedirs(export_dir, exist_ok=True)
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(sql_content)
             log(f"[SUCCESS] SQL Script saved successfully!", "info")

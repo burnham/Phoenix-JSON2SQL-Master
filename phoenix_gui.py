@@ -16,7 +16,7 @@ import traceback
 
 import phoenix_importer
 
-# [2026-01-19] Anya-Corena: Phoenix SQL Importer GUI (English + Logging Edition)
+# [2026-01-19] Anya-Corena: Phoenix SQL Importer GUI (Hardened Edition)
 
 # Configure Logging for GUI
 log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phoenix_debug.log")
@@ -68,48 +68,15 @@ class WorkerThread(QThread):
                 self.params['host'], p, self.params['db']
             )
             
-            with open(self.params['json'], 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            df = pd.DataFrame(data)
-            df = df[self.params['selected_columns']] # Filter columns
-            
-            self.progress_signal.emit(f"[*] Starting Mode: {self.params['mode'].upper()}")
-            
-            table = self.params['table']
-            dtype_map = self.params['dtype_map']
-
-            if self.params['mode'] == 'nuke':
-                self.progress_signal.emit("[!] Dropping old table...")
-                with engine.connect() as conn:
-                    conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
-                    conn.commit()
-                self.progress_signal.emit("[*] Creating new table...")
-                df.to_sql(table, engine, if_exists='replace', index=False, dtype=dtype_map)
-                
-                # PK Logic
-                with engine.connect() as conn:
-                    pk_field = self.params['pk']
-                    if pk_field and pk_field in df.columns:
-                        try:
-                            conn.execute(text(f"ALTER TABLE {table} ADD PRIMARY KEY ({pk_field});"))
-                        except Exception as e:
-                            logger.warning(f"Failed to set PK: {e}")
-                            self.progress_signal.emit(f"[WARN] Could not set PK (Duplicates?): {e}")
-                    else:
-                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN id SERIAL PRIMARY KEY;"))
-                    conn.commit()
-            
-            elif self.params['mode'] == 'upsert':
-                self.progress_signal.emit("[*] Processing UPSERT strategy...")
-                phoenix_importer.process_data(
-                    self.params['json'], table, engine, 'upsert', 
-                    self.params['pk'], gui_callback=self.progress_signal.emit
-                )
-            
-            elif self.params['mode'] == 'append':
-                self.progress_signal.emit("[*] Appending data...")
-                df.to_sql(table, engine, if_exists='append', index=False, dtype=dtype_map)
+            # Delegate all complexity to phoenix_importer.process_data
+            phoenix_importer.process_data(
+                json_path=self.params['json'],
+                table_name=self.params['table'],
+                engine=engine,
+                mode=self.params['mode'],
+                pk_field=self.params['pk'],
+                gui_callback=self.progress_signal.emit
+            )
 
             logger.info("Import Process Finished Successfully")
             self.finished_signal.emit(True, "Process finished successfully!")
@@ -375,7 +342,6 @@ class PhoenixApp(QMainWindow):
 
     def run_import(self):
         selected_cols = []
-        dtype_map = {}
         pk = ""
         for i in range(self.table_schema.rowCount()):
             chk_widget = self.table_schema.cellWidget(i, 0)
@@ -383,25 +349,20 @@ class PhoenixApp(QMainWindow):
             if chk.isChecked():
                 col_name = self.table_schema.item(i, 1).text()
                 selected_cols.append(col_name)
-                sql_type_str = self.table_schema.cellWidget(i, 3).currentText()
-                if sql_type_str == "JSONB": dtype_map[col_name] = sqlalchemy.dialects.postgresql.JSONB
-                elif sql_type_str == "INTEGER": dtype_map[col_name] = sqlalchemy.Integer
-                elif sql_type_str == "NUMERIC": dtype_map[col_name] = sqlalchemy.Float
-                elif sql_type_str == "BOOLEAN": dtype_map[col_name] = sqlalchemy.Boolean
-                else: dtype_map[col_name] = sqlalchemy.Text()
                 
                 pk_widget = self.table_schema.cellWidget(i, 4)
                 pk_chk = pk_widget.findChild(QCheckBox)
                 if pk_chk.isChecked(): pk = col_name
 
+        mode = self.mode_combo.currentText().split(" ")[0]
         params = {
             'json': self.json_path, 'host': self.host.text(), 'port': self.port.text(), 'db': self.db.text(),
             'user': self.user.text(), 'pass': self.pw.text(), 'table': self.table_name.text(),
-            'mode': self.mode_combo.currentText().split(" ")[0],
-            'selected_columns': selected_cols,
-            'dtype_map': dtype_map, 'pk': pk
+            'mode': mode,
+            'pk': pk
         }
-        logger.info(f"Starting import: {params['mode']} on {params['table']}")
+        
+        logger.info(f"Starting import GUI: {params['mode']} on {params['table']}")
         self.worker = WorkerThread(params)
         self.worker.progress_signal.connect(self.update_log)
         self.worker.finished_signal.connect(lambda s, m: QMessageBox.information(self, "Status", m))

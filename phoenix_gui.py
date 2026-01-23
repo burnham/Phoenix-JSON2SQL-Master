@@ -5,17 +5,21 @@ import pandas as pd
 import sqlalchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine.url import URL
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog, 
-                             QStackedWidget, QMessageBox, QComboBox, QProgressBar, 
-                             QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QFrame,
-                             QRadioButton)
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog, 
+    QStackedWidget, QMessageBox, QComboBox, QProgressBar, 
+    QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QFrame,
+    QRadioButton, QScrollArea, QGridLayout, QStackedLayout, QGraphicsOpacityEffect
+)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont, QColor, QIcon
+from PyQt6.QtGui import QFont, QColor, QIcon, QPixmap
 import logger_config
 import traceback
 
 import phoenix_importer
+
+import ctypes  # ADDED
 
 # [2026-01-19] Anya-Corena: Phoenix SQL Importer GUI (Hardened Edition)
 
@@ -85,7 +89,7 @@ class PhoenixApp(QMainWindow):
         self.setWindowTitle("Phoenix SQL Importer (Pro Edition)")
         self.setMinimumSize(1000, 750)
         
-        icon_path = resource_path("icon.png")
+        icon_path = resource_path("resources/phoenix_icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         
@@ -93,6 +97,9 @@ class PhoenixApp(QMainWindow):
         self.setCentralWidget(self.central)
         self.layout = QVBoxLayout(self.central)
         
+        # 0. LOGO HEADER - REMOVED per user request for cleaner look.
+        # The watermark is now in the preview area.
+
         # 1. STEP BAR
         self.step_layout = QHBoxLayout()
         self.step_labels = []
@@ -147,6 +154,27 @@ class PhoenixApp(QMainWindow):
         self.df = None
         logger.info("GUI Initialized")
 
+    def resizeEvent(self, event):
+        """Dynamic Watermark Scaling: Keeps wings safe from edges."""
+        if hasattr(self, 'watermark') and hasattr(self, 'watermark_pixmap') and hasattr(self, 'preview_container'):
+            container_size = self.preview_container.size()
+            
+            # Calculate target size: 85% of container height (leaves 7.5% margin top/bottom)
+            # This ensures the Phoenix wings don't get covered by buttons or edges.
+            target_h = int(container_size.height() * 0.85) 
+            target_w = int(container_size.width() * 0.85)
+
+            # Scale original pixmap maintaining aspect ratio
+            scaled_pix = self.watermark_pixmap.scaled(
+                target_w, target_h, 
+                Qt.AspectRatioMode.KeepAspectRatio, 
+                Qt.TransformationMode.SmoothTransformation
+            )
+            
+            self.watermark.setPixmap(scaled_pix)
+        
+        super().resizeEvent(event)
+
     def apply_styles(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #FDFBF7; }
@@ -182,6 +210,17 @@ class PhoenixApp(QMainWindow):
             else:
                 lbl.setStyleSheet("background-color: #DADADA; color: #555; padding: 8px; border-radius: 4px;")
         
+        # UX Logic for Step 4 (Config) - Dynamic Visibility
+        if self.current_step == 3: # Index 3 = Step 4
+            if self.skip_conn.isChecked():
+                self.target_db.setVisible(False)
+                self.target_sql.setChecked(True)
+                self.target_sql.setText("Export as SQL Script (.sql) - (Skip Connection Active)")
+                self.mode_combo.setEnabled(True) # Ensure mode selection is still possible if needed for SQL generation nuance
+            else:
+                self.target_db.setVisible(True)
+                self.target_sql.setText("Export as SQL Script (.sql)")
+        
         self.btn_back.setVisible(self.current_step > 0)
         self.btn_back.setText("Back")
         if self.current_step == 4:
@@ -199,9 +238,40 @@ class PhoenixApp(QMainWindow):
         btn_json.clicked.connect(self.load_json)
         l1.addWidget(btn_json)
         
-        self.preview = QTextEdit(); self.preview.setReadOnly(True)
-        self.preview.setStyleSheet("color: #000; background-color: #FFF8DC; border: 1px solid #FFD700;")
-        l1.addWidget(self.preview)
+        # --- Watermark container for preview (StackedLayout for layering) ---
+        self.preview_container = QWidget()
+        self.preview_container.setMinimumHeight(450) # Increased height for better view
+        self.preview_stack = QStackedLayout(self.preview_container)
+        self.preview_stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
+
+        # LAYER 1: Watermark label (background)
+        self.watermark = QLabel()
+        self.watermark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        wm_path = resource_path("resources/phoenix_center.png")
+        if os.path.exists(wm_path):
+            self.watermark_pixmap = QPixmap(wm_path) # Store ORIGINAL for dynamic scaling
+            # Initial placeholder scale - actual scaling happens in resizeEvent
+            pix = self.watermark_pixmap.scaled(350, 350, Qt.AspectRatioMode.KeepAspectRatio) 
+            self.watermark.setPixmap(pix)
+            self.watermark.setScaledContents(False) 
+        
+        opacity = QGraphicsOpacityEffect(self.watermark)
+        opacity.setOpacity(0.08)  # 8% opacity as requested
+        self.watermark.setGraphicsEffect(opacity)
+        
+        self.preview_stack.addWidget(self.watermark)
+
+        # LAYER 2: Foreground preview (Transparent TextEdit)
+        self.preview = QTextEdit()
+        self.preview.setReadOnly(True)
+        # Transparent background to show watermark
+        self.preview.setStyleSheet("color: #000; background-color: transparent; border: 1px solid #FFD700;")
+        # Important attribute for transparency
+        self.preview.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        self.preview_stack.addWidget(self.preview)
+
+        l1.addWidget(self.preview_container)
         self.stack.addWidget(p1)
 
         # --- PAGE 2: CONN ---
@@ -430,6 +500,8 @@ class PhoenixApp(QMainWindow):
             self.current_step += 1
             logger.info(f"UI: Navigation NEXT - {old_step} -> {self.current_step}")
             self.stack.setCurrentIndex(self.current_step)
+            
+            # Smart Logic for Step 4 (Config) - Handled in update_step_visuals now    
             self.update_step_visuals()
             
             # Update Execute button text
@@ -471,7 +543,12 @@ class PhoenixApp(QMainWindow):
         # --- Pre-run Confirmation ---
         export_path = None
         if self.target_sql.isChecked():
-            default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", "import_script.sql")
+            # Smart Naming: Use JSON filename as base
+            json_name = os.path.basename(self.json_path)
+            base_name = os.path.splitext(json_name)[0]
+            default_filename = f"{base_name}.sql"
+            
+            default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", default_filename)
             fname, _ = QFileDialog.getSaveFileName(self, "Save SQL Script", default_path, "SQL Files (*.sql)")
             if not fname: return
             export_path = fname
@@ -521,7 +598,15 @@ class PhoenixApp(QMainWindow):
         self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
 
 if __name__ == "__main__":
+    if sys.platform.startswith("win"):
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("nonrealxr.phoenix.sqlimporter")
+
     app = QApplication(sys.argv)
+
+    icon_path = resource_path("resources/phoenix_icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+
     window = PhoenixApp()
     window.show()
     sys.exit(app.exec())

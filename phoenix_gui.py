@@ -131,7 +131,7 @@ class PhoenixApp(QMainWindow):
                 </p>
                 <p style='font-size: 15px; font-weight: bold; color: #222;'>
                     <a href="https://www.linkedin.com/in/gobh/" style="color: #222; text-decoration: none;">
-                        <img src="{ln_path}" width="16" height="16" style="vertical-align: middle;">&nbsp;[REDACTED_NAME] [REDACTED_USER] H.
+                        <img src="{ln_path}" width="16" height="16" style="vertical-align: middle;">&nbsp;Georgios Burnham H.
                     </a>
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #DDD;">|</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     <a href="https://github.com/burnham" style="color: #222; text-decoration: none;">
@@ -145,24 +145,57 @@ class PhoenixApp(QMainWindow):
             </div>
         """)
         self.apply_styles()
+        self.current_step = 0
+        self.df = None
         self.setup_ui()
         
         # Add footer at the very bottom
         self.layout.addWidget(self.footer)
-        self.current_step = 0
         self.update_step_visuals()
-        self.df = None
         logger.info("GUI Initialized")
+
+    def update_step_visuals(self):
+        # 🛡️ Hardened Safety Checks: Prevent initialization crashes
+        for attr in ['current_step', 'step_labels', 'btn_back', 'btn_next', 'skip_conn', 'action_target_val']:
+            if not hasattr(self, attr):
+                return
+
+        # 1. Update Step Bar Colors
+        for i, lbl in enumerate(self.step_labels):
+            if i == self.current_step:
+                lbl.setStyleSheet("background-color: #FF8C00; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
+            else:
+                lbl.setStyleSheet("background-color: #DDD; color: #555; padding: 8px; border-radius: 4px; font-weight: bold;")
+        
+        # 2. Dynamic 'Action Target' Sync (Page 4 Info Label)
+        is_skipped = self.skip_conn.isChecked()
+        target_text = "EXPORT AS SQL SCRIPT (.sql)" if is_skipped else "DIRECT IMPORT TO DATABASE"
+        self.action_target_val.setText(target_text)
+        logger.info(f"UI: Action Target updated to: {target_text}")
+        
+        # 3. Handle Navigation Buttons Visibility
+        self.btn_back.setVisible(self.current_step > 0)
+        
+        # 4. Handle 'Next' vs 'Execute' branding
+        if self.current_step == 4:
+            self.btn_next.setVisible(False) # Hide next button on the console page
+        else:
+            self.btn_next.setVisible(True)
+            # If on Page 4, the label is 'Execute' equivalent naming
+            if self.current_step == 3:
+                btn_txt = "Export SQL..." if is_skipped else "Start Import"
+                self.btn_next.setText(btn_txt)
+            else:
+                self.btn_next.setText("Next")
 
     def resizeEvent(self, event):
         """Dynamic Watermark Scaling: Keeps wings safe from edges."""
         if hasattr(self, 'watermark') and hasattr(self, 'watermark_pixmap') and hasattr(self, 'preview_container'):
             container_size = self.preview_container.size()
             
-            # Calculate target size: 85% of container height (leaves 7.5% margin top/bottom)
-            # This ensures the Phoenix wings don't get covered by buttons or edges.
-            target_h = int(container_size.height() * 0.85) 
-            target_w = int(container_size.width() * 0.85)
+            # Calculate target size: 92% of container (leaves safe margins)
+            target_h = int(container_size.height() * 0.92) 
+            target_w = int(container_size.width() * 0.92)
 
             # Scale original pixmap maintaining aspect ratio
             scaled_pix = self.watermark_pixmap.scaled(
@@ -203,33 +236,15 @@ class PhoenixApp(QMainWindow):
             QMessageBox QLabel { color: #000; font-size: 14px; }
         """)
 
-    def update_step_visuals(self):
-        for i, lbl in enumerate(self.step_labels):
-            if i == self.current_step:
-                lbl.setStyleSheet("background-color: #FF8C00; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
-            else:
-                lbl.setStyleSheet("background-color: #DADADA; color: #555; padding: 8px; border-radius: 4px;")
-        
-        # UX Logic for Step 4 (Config) - Dynamic Visibility
-        if self.current_step == 3: # Index 3 = Step 4
-            if self.skip_conn.isChecked():
-                self.target_db.setVisible(False)
-                self.target_sql.setChecked(True)
-                self.target_sql.setText("Export as SQL Script (.sql) - (Skip Connection Active)")
-                self.mode_combo.setEnabled(True) # Ensure mode selection is still possible if needed for SQL generation nuance
-            else:
-                self.target_db.setVisible(True)
-                self.target_sql.setText("Export as SQL Script (.sql)")
-        
-        self.btn_back.setVisible(self.current_step > 0)
-        self.btn_back.setText("Back")
-        if self.current_step == 4:
-            self.btn_next.setVisible(False)
-        else:
-            self.btn_next.setVisible(True)
-            self.btn_next.setText("Next")
 
     def setup_ui(self):
+        # 0. PRE-INITIALIZE NAV BUTTONS (Avoid initialization race conditions)
+        self.btn_back = QPushButton("Back")
+        self.btn_back.clicked.connect(self.go_back)
+        
+        self.btn_next = QPushButton("Next", objectName="NextBtn")
+        self.btn_next.clicked.connect(self.go_next)
+
         # --- PAGE 1: JSON ---
         p1 = QWidget(); l1 = QVBoxLayout(p1)
         l1.addWidget(QLabel("Load JSON File", objectName="Header"))
@@ -256,7 +271,7 @@ class PhoenixApp(QMainWindow):
             self.watermark.setScaledContents(False) 
         
         opacity = QGraphicsOpacityEffect(self.watermark)
-        opacity.setOpacity(0.08)  # 8% opacity as requested
+        opacity.setOpacity(0.16)  # 16% opacity (Doubled from 8%)
         self.watermark.setGraphicsEffect(opacity)
         
         self.preview_stack.addWidget(self.watermark)
@@ -279,11 +294,11 @@ class PhoenixApp(QMainWindow):
         l2.addWidget(QLabel("Database Connection", objectName="Header"))
         
         form = QVBoxLayout()
-        self.host = QLineEdit("localhost")); form.addWidget(self.host)
-        self.port = QLineEdit("[REDACTED_VALUE]")); form.addWidget(self.port)
-        self.db = QLineEdit("")); form.addWidget(self.db)
-        self.user = QLineEdit("[REDACTED_VALUE]")); form.addWidget(self.user)
-        self.pw = QLineEdit("")); form.addWidget(self.pw)
+        self.host = QLineEdit("localhost"); form.addWidget(QLabel("Host:")); form.addWidget(self.host)
+        self.port = QLineEdit("5432"); form.addWidget(QLabel("Port:")); form.addWidget(self.port)
+        self.db = QLineEdit(""); form.addWidget(QLabel("Database:")); form.addWidget(self.db)
+        self.user = QLineEdit("postgres"); form.addWidget(QLabel("User:")); form.addWidget(self.user)
+        self.pw = QLineEdit(""); self.pw.setEchoMode(QLineEdit.EchoMode.Password); form.addWidget(QLabel("Password:")); form.addWidget(self.pw)
         l2.addLayout(form)
         
         btn_test = QPushButton("Test Connection", objectName="ActionBtn")
@@ -291,8 +306,8 @@ class PhoenixApp(QMainWindow):
         l2.addWidget(btn_test)
 
         l2.addSpacing(20)
-        self.skip_conn = QCheckBox("Skip Connection (SQL Export Mode Only)")
-        self.skip_conn.setStyleSheet("color: #B22222; font-weight: bold;")
+        self.skip_conn = QCheckBox("SKIP CONNECTION (SQL EXPORT MODE ONLY)")
+        self.skip_conn.setStyleSheet("font-size: 13px; font-weight: bold; color: #000000;")
         l2.addWidget(self.skip_conn)
         
         self.stack.addWidget(p2)
@@ -329,13 +344,18 @@ class PhoenixApp(QMainWindow):
 
         l4.addSpacing(20)
         l4.addWidget(QLabel("Action Target:", objectName="Header"))
-        self.target_db = QRadioButton("Direct Import to Database")
-        self.target_db.setChecked(True)
-        self.target_sql = QRadioButton("Export as SQL Script (.sql)")
-        l4.addWidget(self.target_db)
-        l4.addWidget(self.target_sql)
+        
+        # Information Label (Replaces selectables for better UX)
+        self.action_target_val = QLabel("DIRECT IMPORT TO DATABASE")
+        self.action_target_val.setStyleSheet("font-size: 13px; font-weight: bold; color: #000000; padding: 5px; background: #FFF9E6; border: 1px dashed #FFD700; border-radius: 4px;")
+        l4.addWidget(self.action_target_val)
         
         self.stack.addWidget(p4)
+
+        # --- FINAL SIGNAL CONNECTIONS ---
+        self.skip_conn.toggled.connect(self.update_step_visuals)
+        # Initial trigger
+        self.update_step_visuals()
 
         # --- PAGE 5: RUN ---
         p5 = QWidget(); l5 = QVBoxLayout(p5)
@@ -354,14 +374,9 @@ class PhoenixApp(QMainWindow):
         l5.addWidget(btn_run)
         self.stack.addWidget(p5)
 
-        # NAV BUTTONS
+        # NAV BUTTONS LAYOUT
         nav = QHBoxLayout()
-        self.btn_back = QPushButton("Back")
-        self.btn_back.clicked.connect(self.go_back)
         nav.addWidget(self.btn_back)
-        
-        self.btn_next = QPushButton("Next", objectName="NextBtn")
-        self.btn_next.clicked.connect(self.go_next)
         nav.addWidget(self.btn_next)
         self.layout.addLayout(nav)
 
@@ -501,12 +516,12 @@ class PhoenixApp(QMainWindow):
             logger.info(f"UI: Navigation NEXT - {old_step} -> {self.current_step}")
             self.stack.setCurrentIndex(self.current_step)
             
-            # Smart Logic for Step 4 (Config) - Handled in update_step_visuals now    
+            # Smart Logic handled in update_step_visuals
             self.update_step_visuals()
             
             # Update Execute button text
             if self.current_step == 4:
-                if self.target_sql.isChecked():
+                if self.skip_conn.isChecked():
                     self.btn_next.setText("Export SQL...")
                 else:
                     self.btn_next.setText("Start Import")
@@ -542,7 +557,7 @@ class PhoenixApp(QMainWindow):
         
         # --- Pre-run Confirmation ---
         export_path = None
-        if self.target_sql.isChecked():
+        if self.skip_conn.isChecked():
             # Smart Naming: Use JSON filename as base
             json_name = os.path.basename(self.json_path)
             base_name = os.path.splitext(json_name)[0]
@@ -553,10 +568,6 @@ class PhoenixApp(QMainWindow):
             if not fname: return
             export_path = fname
         else:
-            if self.skip_conn.isChecked():
-                QMessageBox.critical(self, "Error", "Connection skipped in Step 2. You must select 'Export as SQL Script' or configure the connection.")
-                return
-                
             try:
                 p = int(self.port.text())
                 engine = phoenix_importer.get_engine(self.user.text(), self.pw.text(), self.host.text(), p, self.db.text())

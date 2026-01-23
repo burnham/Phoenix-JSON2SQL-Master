@@ -25,9 +25,11 @@ logs/
 exports/
 *.sql
 
-# Backups
+# Backups & Archives
 BACKUPS/
 backups/
+*.rar
+*.zip
 
 # Documentation (until README is complete)
 Docs/

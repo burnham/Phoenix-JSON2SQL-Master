@@ -8,21 +8,12 @@ import argparse
 import sys
 import os
 import re
-import logging
+import logger_config
 
 # [2026-01-19] Anya-Corena: Phoenix SQL Importer (Hardened Edition)
 
-# Configure Logging
-log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phoenix_debug.log")
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("PhoenixImporter")
+# Configure Logging using centralized system
+logger = logger_config.setup_logger("PhoenixImporter")
 
 def clean_currency(val):
     """Attempts to clean currency fields like '28.00 EUR' to 28.00 (float)."""
@@ -99,11 +90,16 @@ def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callbac
             
         dupes = df[df.duplicated(subset=[pk_field], keep=False)]
         if not dupes.empty:
+            num_dupes = len(dupes)
             dupe_values = dupes[pk_field].unique()[:5]
-            log(f"[ERROR] Data contains DUPLICATES in '{pk_field}' column!", "error")
-            log(f"[ERROR] Examples: {list(dupe_values)}", "error")
-            log(f"[ERROR] Operation aborted. Please clean your data first.", "error")
-            raise ValueError(f"Duplicate values found in '{pk_field}'. Cannot set as Primary Key.")
+            log(f"[WARN] Data contains {num_dupes} rows with duplicate '{pk_field}' values!", "warning")
+            log(f"[WARN] Examples: {list(dupe_values)}", "warning")
+            log(f"[*] Cleaning data: Keeping only the LAST occurrence of each '{pk_field}'...")
+            
+            initial_count = len(df)
+            df = df.drop_duplicates(subset=[pk_field], keep='last')
+            final_count = len(df)
+            log(f"[!] Cleaned: {initial_count - final_count} duplicate rows removed.")
 
     log("[*] Inferring SQL schema...")
     dtype_map = analyze_dataframe(df)
@@ -199,6 +195,8 @@ def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callbac
             for i in range(0, total, batch_size):
                 batch = records[i:i+batch_size]
                 stmt = insert(table).values(batch)
+                
+                # Identify columns to update (all except PK)
                 update_cols = {c.name: c for c in stmt.excluded if c.name != pk_field}
                 
                 if update_cols:
@@ -208,7 +206,9 @@ def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callbac
                 
                 conn.execute(stmt)
                 conn.commit()
-                log(f"    -> Processed {min(i+batch_size, total)}/{total}")
+                
+                current_count = min(i + batch_size, total)
+                log(f"    -> [BATCH] Processed {current_count}/{total} records (Mode: UPSERT)")
 
     log(f"[SUCCESS] Operation '{mode.upper()}' complete.")
 

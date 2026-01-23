@@ -31,9 +31,6 @@ backups/
 *.rar
 *.zip
 
-# Documentation (until README is complete)
-Docs/
-
 # Virtual environments
 .venv/
 venv_build/

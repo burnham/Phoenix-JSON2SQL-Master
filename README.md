@@ -8,7 +8,7 @@ Phoenix SQL Importer is a professional-grade desktop application that automates 
 
 ## 📸 Interface
 
-![Phoenix SQL Importer Interface](Docs/Screenshot%202026-01-20%20180338.png)
+![Phoenix SQL Importer Interface](Docs/Build.png)
 
 *The Phoenix SQL Importer v5.0 interface showing the complete workflow from JSON selection to database execution.*
 

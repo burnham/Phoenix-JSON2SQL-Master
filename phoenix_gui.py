@@ -489,6 +489,21 @@ class PhoenixApp(QMainWindow):
 
     def test_conn(self):
         logger.info("UI: User clicked Test Connection")
+        
+        # Validation: Check for empty fields
+        missing = []
+        if not self.host.text().strip(): missing.append("Host")
+        if not self.port.text().strip(): missing.append("Port")
+        if not self.db.text().strip(): missing.append("Database")
+        if not self.user.text().strip(): missing.append("User")
+        # Password might be empty in some weird configs, but usually required. Let's warn if user is also empty.
+        
+        if missing:
+            QMessageBox.warning(self, "Missing Connection Data", 
+                              f"Please fill in the following fields:\n- {', '.join(missing)}\n\n"
+                              "A valid database connection is required.")
+            return
+
         try:
             p = int(self.port.text())
             url = URL.create("postgresql+psycopg2", username=self.user.text(), password=self.pw.text(), host=self.host.text(), port=p, database=self.db.text())
@@ -568,6 +583,19 @@ class PhoenixApp(QMainWindow):
             if not fname: return
             export_path = fname
         else:
+            # Validation: Check for empty fields before connecting
+            missing = []
+            if not self.host.text().strip(): missing.append("Host")
+            if not self.port.text().strip(): missing.append("Port")
+            if not self.db.text().strip(): missing.append("Database")
+            if not self.user.text().strip(): missing.append("User")
+            
+            if missing:
+                QMessageBox.warning(self, "Missing Connection Data", 
+                                  f"Please fill in the following fields:\n- {', '.join(missing)}\n\n"
+                                  "A valid database connection is required.")
+                return
+
             try:
                 p = int(self.port.text())
                 engine = phoenix_importer.get_engine(self.user.text(), self.pw.text(), self.host.text(), p, self.db.text())

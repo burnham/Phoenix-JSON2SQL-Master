@@ -182,17 +182,6 @@ class PhoenixApp(QMainWindow):
             else:
                 lbl.setStyleSheet("background-color: #DADADA; color: #555; padding: 8px; border-radius: 4px;")
         
-        # UX Logic for Step 4 (Config) - Dynamic Visibility
-        if self.current_step == 3: # Index 3 = Step 4
-            if self.skip_conn.isChecked():
-                self.target_db.setVisible(False)
-                self.target_sql.setChecked(True)
-                self.target_sql.setText("Export as SQL Script (.sql) - (Skip Connection Active)")
-                self.mode_combo.setEnabled(True) # Ensure mode selection is still possible if needed for SQL generation nuance
-            else:
-                self.target_db.setVisible(True)
-                self.target_sql.setText("Export as SQL Script (.sql)")
-        
         self.btn_back.setVisible(self.current_step > 0)
         self.btn_back.setText("Back")
         if self.current_step == 4:
@@ -441,8 +430,6 @@ class PhoenixApp(QMainWindow):
             self.current_step += 1
             logger.info(f"UI: Navigation NEXT - {old_step} -> {self.current_step}")
             self.stack.setCurrentIndex(self.current_step)
-            
-            # Smart Logic for Step 4 (Config) - Handled in update_step_visuals now    
             self.update_step_visuals()
             
             # Update Execute button text
@@ -484,12 +471,7 @@ class PhoenixApp(QMainWindow):
         # --- Pre-run Confirmation ---
         export_path = None
         if self.target_sql.isChecked():
-            # Smart Naming: Use JSON filename as base
-            json_name = os.path.basename(self.json_path)
-            base_name = os.path.splitext(json_name)[0]
-            default_filename = f"{base_name}.sql"
-            
-            default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", default_filename)
+            default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", "import_script.sql")
             fname, _ = QFileDialog.getSaveFileName(self, "Save SQL Script", default_path, "SQL Files (*.sql)")
             if not fname: return
             export_path = fname

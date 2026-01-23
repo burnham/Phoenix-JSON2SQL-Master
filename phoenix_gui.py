@@ -8,27 +8,19 @@ from sqlalchemy.engine.url import URL
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog, 
                              QStackedWidget, QMessageBox, QComboBox, QProgressBar, 
-                             QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QFrame)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QFrame,
+                             QRadioButton)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QIcon
-import logging
+import logger_config
 import traceback
 
 import phoenix_importer
 
 # [2026-01-19] Anya-Corena: Phoenix SQL Importer GUI (Hardened Edition)
 
-# Configure Logging for GUI
-log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phoenix_debug.log")
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("PhoenixGUI")
+# Configure Logging using centralized system
+logger = logger_config.setup_logger("PhoenixGUI")
 
 def exception_hook(exctype, value, tb):
     """Global hook to catch unhandled exceptions and log them."""
@@ -63,10 +55,12 @@ class WorkerThread(QThread):
             except:
                 p = 5432
 
-            engine = phoenix_importer.get_engine(
-                self.params['user'], self.params['pass'], 
-                self.params['host'], p, self.params['db']
-            )
+            engine = None
+            if not self.params.get('export_path'):
+                engine = phoenix_importer.get_engine(
+                    self.params['user'], self.params['pass'], 
+                    self.params['host'], p, self.params['db']
+                )
             
             # Delegate all complexity to phoenix_importer.process_data
             phoenix_importer.process_data(
@@ -75,7 +69,8 @@ class WorkerThread(QThread):
                 engine=engine,
                 mode=self.params['mode'],
                 pk_field=self.params['pk'],
-                gui_callback=self.progress_signal.emit
+                gui_callback=self.progress_signal.emit,
+                export_path=self.params.get('export_path')
             )
 
             logger.info("Import Process Finished Successfully")
@@ -87,7 +82,7 @@ class WorkerThread(QThread):
 class PhoenixApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Phoenix SQL Importer (English Edition)")
+        self.setWindowTitle("Phoenix SQL Importer (Pro Edition)")
         self.setMinimumSize(1000, 750)
         
         icon_path = resource_path("icon.png")
@@ -101,7 +96,7 @@ class PhoenixApp(QMainWindow):
         # 1. STEP BAR
         self.step_layout = QHBoxLayout()
         self.step_labels = []
-        steps = ["1. JSON File", "2. Connection", "3. Schema", "4. Config", "5. Execute"]
+        steps = ["1. JSON", "2. Connection", "3. Schema", "4. Config", "5. Execute"]
         for s in steps:
             lbl = QLabel(s)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -114,8 +109,39 @@ class PhoenixApp(QMainWindow):
         self.stack = QStackedWidget()
         self.layout.addWidget(self.stack)
         
+        # 3. FOOTER BRANDING
+        self.footer = QLabel()
+        self.footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.footer.setOpenExternalLinks(True)
+        
+        ln_path = "file:///" + resource_path("resources/linkedin_icon.png").replace("\\", "/")
+        gh_path = "file:///" + resource_path("resources/github_icon.png").replace("\\", "/")
+        
+        self.footer.setText(f"""
+            <div style='text-align: center; margin-top: 30px; border-top: 1px solid #EEE; padding-top: 20px;'>
+                <p style='font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;'>
+                    Secured via Phoenix Engine & PostgreSafe Database
+                </p>
+                <p style='font-size: 15px; font-weight: bold; color: #222;'>
+                    <a href="https://www.linkedin.com/in/gobh/" style="color: #222; text-decoration: none;">
+                        <img src="{ln_path}" width="16" height="16" style="vertical-align: middle;">&nbsp;[REDACTED_NAME] [REDACTED_USER] H.
+                    </a>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #DDD;">|</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a href="https://github.com/burnham" style="color: #222; text-decoration: none;">
+                        <img src="{gh_path}" width="16" height="16" style="vertical-align: middle;">&nbsp;GitHub
+                    </a>
+                </p>
+                <p style='font-size: 13px; color: #555; margin-top: 10px; font-weight: 500;'>
+                    IT Support Service | Web Solutions | Immersive 3D Visualization & BIM Expertise | Transforming blueprints<br>
+                    into 3D experiences that sell
+                </p>
+            </div>
+        """)
         self.apply_styles()
         self.setup_ui()
+        
+        # Add footer at the very bottom
+        self.layout.addWidget(self.footer)
         self.current_step = 0
         self.update_step_visuals()
         self.df = None
@@ -124,26 +150,29 @@ class PhoenixApp(QMainWindow):
     def apply_styles(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #FDFBF7; }
-            QLabel { font-family: 'Segoe UI'; font-size: 14px; color: #333; }
-            QLabel#Header { font-size: 22px; font-weight: bold; color: #B22222; margin-bottom: 10px; }
+            QLabel { font-family: 'Segoe UI'; font-size: 15px; color: #333; }
+            QLabel#Header { font-size: 24px; font-weight: bold; color: #B22222; margin-bottom: 12px; }
             QLineEdit, QComboBox, QTableWidget {
                 background-color: #FFF; color: #000; border: 1px solid #CCC;
-                border-radius: 4px; padding: 6px; font-size: 13px;
+                border-radius: 4px; padding: 8px; font-size: 14px;
             }
             QPushButton {
                 background-color: #E0E0E0; border: none; border-radius: 4px;
-                padding: 8px 16px; font-weight: bold; color: #333;
+                padding: 10px 20px; font-weight: bold; color: #333; font-size: 14px;
             }
             QPushButton:hover { background-color: #D0D0D0; }
             QPushButton#ActionBtn { background-color: #FF8C00; color: white; }
             QPushButton#ActionBtn:hover { background-color: #FF4500; }
-            QPushButton#NextBtn { background-color: #2F4F4F; color: white; min-width: 100px; }
+            QPushButton#NextBtn { background-color: #2F4F4F; color: white; min-width: 120px; font-size: 15px; }
             
-            QTableWidget::item { padding: 5px; }
-            QComboBox::drop-down { border: none; width: 20px; }
+            QRadioButton { color: #222; font-size: 15px; spacing: 8px; }
+            QRadioButton::indicator { width: 18px; height: 18px; }
+            
+            QTableWidget::item { padding: 6px; }
+            QComboBox::drop-down { border: none; width: 24px; }
             
             QMessageBox { background-color: #FFF; }
-            QMessageBox QLabel { color: #000; }
+            QMessageBox QLabel { color: #000; font-size: 14px; }
         """)
 
     def update_step_visuals(self):
@@ -151,9 +180,21 @@ class PhoenixApp(QMainWindow):
             if i == self.current_step:
                 lbl.setStyleSheet("background-color: #FF8C00; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
             else:
-                lbl.setStyleSheet("background-color: #EEE; color: #AAA; padding: 8px; border-radius: 4px;")
+                lbl.setStyleSheet("background-color: #DADADA; color: #555; padding: 8px; border-radius: 4px;")
+        
+        # UX Logic for Step 4 (Config) - Dynamic Visibility
+        if self.current_step == 3: # Index 3 = Step 4
+            if self.skip_conn.isChecked():
+                self.target_db.setVisible(False)
+                self.target_sql.setChecked(True)
+                self.target_sql.setText("Export as SQL Script (.sql) - (Skip Connection Active)")
+                self.mode_combo.setEnabled(True) # Ensure mode selection is still possible if needed for SQL generation nuance
+            else:
+                self.target_db.setVisible(True)
+                self.target_sql.setText("Export as SQL Script (.sql)")
         
         self.btn_back.setVisible(self.current_step > 0)
+        self.btn_back.setText("Back")
         if self.current_step == 4:
             self.btn_next.setVisible(False)
         else:
@@ -163,9 +204,9 @@ class PhoenixApp(QMainWindow):
     def setup_ui(self):
         # --- PAGE 1: JSON ---
         p1 = QWidget(); l1 = QVBoxLayout(p1)
-        l1.addWidget(QLabel("Load Data File", objectName="Header"))
+        l1.addWidget(QLabel("Load JSON File", objectName="Header"))
         
-        btn_json = QPushButton("Select JSON File", objectName="ActionBtn")
+        btn_json = QPushButton("Select JSON", objectName="ActionBtn")
         btn_json.clicked.connect(self.load_json)
         l1.addWidget(btn_json)
         
@@ -189,6 +230,12 @@ class PhoenixApp(QMainWindow):
         btn_test = QPushButton("Test Connection", objectName="ActionBtn")
         btn_test.clicked.connect(self.test_conn)
         l2.addWidget(btn_test)
+
+        l2.addSpacing(20)
+        self.skip_conn = QCheckBox("Skip Connection (SQL Export Mode Only)")
+        self.skip_conn.setStyleSheet("color: #B22222; font-weight: bold;")
+        l2.addWidget(self.skip_conn)
+        
         self.stack.addWidget(p2)
 
         # --- PAGE 3: SCHEMA ---
@@ -217,9 +264,17 @@ class PhoenixApp(QMainWindow):
         self.mode_combo.currentTextChanged.connect(self.update_mode_desc)
         l4.addWidget(self.mode_combo)
         
-        self.mode_desc = QLabel("Updates existing records (by SKU) and inserts new ones.")
+        self.mode_desc = QLabel("Updates existing records (via SKU) and inserts new ones.")
         self.mode_desc.setStyleSheet("color: #666; font-style: italic; margin-left: 10px;")
         l4.addWidget(self.mode_desc)
+
+        l4.addSpacing(20)
+        l4.addWidget(QLabel("Action Target:", objectName="Header"))
+        self.target_db = QRadioButton("Direct Import to Database")
+        self.target_db.setChecked(True)
+        self.target_sql = QRadioButton("Export as SQL Script (.sql)")
+        l4.addWidget(self.target_db)
+        l4.addWidget(self.target_sql)
         
         self.stack.addWidget(p4)
 
@@ -234,7 +289,7 @@ class PhoenixApp(QMainWindow):
         self.log.setStyleSheet("background-color: #222; color: #0F0; font-family: Consolas;")
         l5.addWidget(self.log)
         
-        btn_run = QPushButton("START IMPORT", objectName="ActionBtn")
+        btn_run = QPushButton("START PROCESS", objectName="ActionBtn")
         btn_run.setMinimumHeight(50)
         btn_run.clicked.connect(self.run_import)
         l5.addWidget(btn_run)
@@ -252,6 +307,7 @@ class PhoenixApp(QMainWindow):
         self.layout.addLayout(nav)
 
     def update_mode_desc(self, text):
+        logger.info(f"UI: User changed mode to: {text}")
         if "upsert" in text:
             self.mode_desc.setText("ℹ️ UPSERT: Updates if ID/SKU exists. Otherwise, creates it (Safe & Recommended).")
         elif "nuke" in text:
@@ -262,7 +318,7 @@ class PhoenixApp(QMainWindow):
     def load_json(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open JSON", "", "JSON (*.json)")
         if path:
-            logger.info(f"User selected file: {path}")
+            logger.info(f"UI: User selected JSON file: {path}")
             self.json_path = path
             try:
                 with open(path, 'r', encoding='utf-8') as f:
@@ -271,26 +327,48 @@ class PhoenixApp(QMainWindow):
                 self.preview.setText(json.dumps(data[:2], indent=2))
                 self.populate_schema()
             except Exception as e:
-                logger.error(f"Error loading JSON: {e}")
+                logger.error(f"UI: Error loading JSON: {e}")
                 self.preview.setText(f"Error: {e}")
 
     def populate_schema(self):
         if self.df is None: return
+        logger.debug(f"UI: Populating schema for {len(self.df.columns)} columns")
         self.table_schema.setRowCount(len(self.df.columns))
+        
+        row_count = len(self.df)
+        
         for i, col in enumerate(self.df.columns):
-            # Include Checkbox
+            # 1. Include Checkbox
             chk = QCheckBox(); chk.setChecked(True); 
             w = QWidget(); l = QHBoxLayout(w); l.addWidget(chk); l.setAlignment(Qt.AlignmentFlag.AlignCenter); l.setContentsMargins(0,0,0,0)
             self.table_schema.setCellWidget(i, 0, w)
             
-            # Field Name
-            self.table_schema.setItem(i, 1, QTableWidgetItem(col))
+            # 2. Field Name
+            item_name = QTableWidgetItem(col)
             
-            # JSON Type
+            # --- Smart Uniqueness Detection ---
+            is_unique = False
+            try:
+                # nunique() fails on lists/dicts
+                unique_count = self.df[col].nunique()
+                is_unique = (unique_count == row_count)
+                
+                if is_unique:
+                    item_name.setForeground(QColor("#228B22")) # Green
+                    item_name.setToolTip("✅ This field is 100% UNIQUE in this file. (Excellent PK candidate)")
+                else:
+                    item_name.setToolTip(f"⚠️ Not unique. Contains {row_count - unique_count} duplicates.")
+            except Exception:
+                # If non-hashable (list/dict), it's definitely not a good PK candidate
+                item_name.setToolTip("ℹ️ Contains complex data (lists/dicts). Not a PK candidate.")
+            
+            self.table_schema.setItem(i, 1, item_name)
+            
+            # 3. JSON Type
             stype = str(self.df[col].dtype)
             self.table_schema.setItem(i, 2, QTableWidgetItem(stype))
             
-            # SQL Combo
+            # 4. SQL Type Combo
             combo = QComboBox()
             combo.addItems(["VARCHAR(255)", "TEXT", "JSONB", "INTEGER", "NUMERIC", "BOOLEAN"])
             
@@ -309,38 +387,83 @@ class PhoenixApp(QMainWindow):
                     combo.setCurrentText("TEXT")
             self.table_schema.setCellWidget(i, 3, combo)
 
-            # PK Checkbox
-            pk_chk = QCheckBox(); pk_chk.setChecked(col.lower() in ['sku', 'id'])
+            # 5. PK Checkbox
+            pk_chk = QCheckBox()
+            # Default suggestion
+            is_default_pk = col.lower() in ['sku', 'id', 'url']
+            pk_chk.setChecked(is_default_pk)
+            
+            # If default suggested PK is NOT unique, show warning
+            if is_default_pk and not is_unique:
+                pk_chk.setStyleSheet("QCheckBox { color: red; }")
+                pk_chk.setText(" (Non-unique!)")
+            
+            pk_chk.stateChanged.connect(lambda state, c=col, u=is_unique: self.on_pk_toggle(state, c, u))
+            
             w_pk = QWidget(); l_pk = QHBoxLayout(w_pk); l_pk.addWidget(pk_chk); l_pk.setAlignment(Qt.AlignmentFlag.AlignCenter); l_pk.setContentsMargins(0,0,0,0)
             self.table_schema.setCellWidget(i, 4, w_pk)
 
+    def on_pk_toggle(self, state, col, is_unique):
+        if state == 2: # Checked
+            logger.info(f"UI: User selected PK: {col}")
+            if not is_unique:
+                 QMessageBox.warning(self, "Non-Unique Key", 
+                                    f"The field '{col}' contains duplicates in this JSON.\n\n"
+                                    "Phoenix will automatically deduplicate the data (keeping the last occurrence) "
+                                    "before importing, but this might not be what you want.\n\n"
+                                    "Consider using a unique field like 'url' if available.")
+
     def test_conn(self):
+        logger.info("UI: User clicked Test Connection")
         try:
             p = int(self.port.text())
             url = URL.create("postgresql+psycopg2", username=self.user.text(), password=self.pw.text(), host=self.host.text(), port=p, database=self.db.text())
             engine = create_engine(url)
-            with engine.connect() as conn: QMessageBox.information(self, "Success", "Connection established successfully!")
+            with engine.connect() as conn: 
+                logger.info("UI: Connection test: SUCCESS")
+                QMessageBox.information(self, "Success", "Connection established successfully!")
         except Exception as e: 
-            logger.error(f"Connection test failed: {e}")
+            logger.error(f"UI: Connection test: FAILED - {e}")
             QMessageBox.critical(self, "Connection Error", str(e))
 
     def go_next(self):
+        old_step = self.current_step
         if self.current_step == 0:
             if not hasattr(self, 'json_path') or not self.json_path:
                 QMessageBox.warning(self, "Missing File", "Please select a JSON file to continue.")
                 return
+        if self.current_step == 1:
+            # If skipping conn, we allow it. Otherwise warn only if user hasn't tested? 
+            # For now, just allow go next if it's not the final step.
+            pass
+            
         if self.current_step < 4:
             self.current_step += 1
+            logger.info(f"UI: Navigation NEXT - {old_step} -> {self.current_step}")
             self.stack.setCurrentIndex(self.current_step)
+            
+            # Smart Logic for Step 4 (Config) - Handled in update_step_visuals now    
             self.update_step_visuals()
+            
+            # Update Execute button text
+            if self.current_step == 4:
+                if self.target_sql.isChecked():
+                    self.btn_next.setText("Export SQL...")
+                else:
+                    self.btn_next.setText("Start Import")
 
     def go_back(self):
+        old_step = self.current_step
         if self.current_step > 0:
             self.current_step -= 1
+            logger.info(f"UI: Navigation BACK - {old_step} -> {self.current_step}")
             self.stack.setCurrentIndex(self.current_step)
             self.update_step_visuals()
+            self.btn_next.setText("Next")
+            self.btn_next.setVisible(True)
 
     def run_import(self):
+        logger.info("UI: User clicked START IMPORT")
         selected_cols = []
         pk = ""
         for i in range(self.table_schema.rowCount()):
@@ -354,15 +477,58 @@ class PhoenixApp(QMainWindow):
                 pk_chk = pk_widget.findChild(QCheckBox)
                 if pk_chk.isChecked(): pk = col_name
 
-        mode = self.mode_combo.currentText().split(" ")[0]
+        mode_text = self.mode_combo.currentText()
+        mode = mode_text.split(" ")[0]
+        table_name = self.table_name.text()
+        
+        # --- Pre-run Confirmation ---
+        export_path = None
+        if self.target_sql.isChecked():
+            # Smart Naming: Use JSON filename as base
+            json_name = os.path.basename(self.json_path)
+            base_name = os.path.splitext(json_name)[0]
+            default_filename = f"{base_name}.sql"
+            
+            default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", default_filename)
+            fname, _ = QFileDialog.getSaveFileName(self, "Save SQL Script", default_path, "SQL Files (*.sql)")
+            if not fname: return
+            export_path = fname
+        else:
+            if self.skip_conn.isChecked():
+                QMessageBox.critical(self, "Error", "Connection skipped in Step 2. You must select 'Export as SQL Script' or configure the connection.")
+                return
+                
+            try:
+                p = int(self.port.text())
+                engine = phoenix_importer.get_engine(self.user.text(), self.pw.text(), self.host.text(), p, self.db.text())
+                inspector = sqlalchemy.inspect(engine)
+                if inspector.has_table(table_name):
+                    logger.info(f"UI: Table '{table_name}' already exists. Asking for confirmation.")
+                    msg = f"Table '{table_name}' already exists.\n\nMode: {mode.upper()}\n"
+                    if mode == 'nuke': msg += "Warning: This will DELETE all existing data in the table."
+                    elif mode == 'upsert': msg += "This will update existing records and add new ones (Recommended)."
+                    elif mode == 'append': msg += "This will add new records to the end."
+                    
+                    res = QMessageBox.question(self, "Confirm Update", msg + "\n\nDo you want to proceed?", 
+                                               QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                    if res == QMessageBox.StandardButton.No:
+                        logger.info("UI: User canceled the operation.")
+                        return
+                else:
+                    logger.info(f"UI: Table '{table_name}' does not exist. Generic creation flow.")
+            except Exception as e:
+                logger.error(f"UI: Error during pre-run check: {e}")
+                QMessageBox.warning(self, "Connection Check Failed", f"Could not verify database: {e}\n\nProceeding anyway...")
+
         params = {
             'json': self.json_path, 'host': self.host.text(), 'port': self.port.text(), 'db': self.db.text(),
-            'user': self.user.text(), 'pass': self.pw.text(), 'table': self.table_name.text(),
+            'user': self.user.text(), 'pass': self.pw.text(), 'table': table_name,
             'mode': mode,
-            'pk': pk
+            'pk': pk,
+            'export_path': export_path
         }
         
-        logger.info(f"Starting import GUI: {params['mode']} on {params['table']}")
+        logger.info(f"UI: Final decision: {params['mode']} on '{params['table']}' with PK='{params['pk']}'")
         self.worker = WorkerThread(params)
         self.worker.progress_signal.connect(self.update_log)
         self.worker.finished_signal.connect(lambda s, m: QMessageBox.information(self, "Status", m))

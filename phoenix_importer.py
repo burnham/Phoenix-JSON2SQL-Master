@@ -59,7 +59,84 @@ def analyze_dataframe(df):
                 dtype_map[col] = String
     return dtype_map
 
-def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callback=None):
+def generate_sql_script(df, table_name, mode, pk_field=None):
+    """Generates a complete PostgreSQL script for the given DataFrame."""
+    sql_lines = []
+    now_str = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
+    sql_lines.append(f"-- Phoenix SQL Pro - Auto-generated Export")
+    sql_lines.append(f"-- Created: {now_str}")
+    sql_lines.append(f"-- Source: JSON\n")
+
+    dtype_map = analyze_dataframe(df)
+    
+    # 1. DROP TABLE
+    if mode == 'nuke':
+        sql_lines.append(f"DROP TABLE IF EXISTS \"{table_name}\";\n")
+
+    # 2. CREATE TABLE (if nuke or if it might not exist)
+    if mode == 'nuke':
+        cols_sql = []
+        for col, dtype in dtype_map.items():
+            sql_type = "TEXT"
+            if dtype == JSONB: sql_type = "JSONB"
+            elif dtype == BigInteger: sql_type = "BIGINT"
+            elif dtype == Float: sql_type = "NUMERIC"
+            elif dtype == Boolean: sql_type = "BOOLEAN"
+            
+            pk_str = " PRIMARY KEY" if col == pk_field else ""
+            cols_sql.append(f"    \"{col}\" {sql_type}{pk_str}")
+        
+        # Add id if no PK and not in columns
+        if not pk_field and 'id' not in df.columns:
+            cols_sql.append("    \"id\" SERIAL PRIMARY KEY")
+
+        sql_lines.append(f"CREATE TABLE \"{table_name}\" (")
+        sql_lines.append(",\n".join(cols_sql))
+        sql_lines.append(");\n")
+
+    # 3. INSERT / UPSERT Statements
+    cols = [f"\"{c}\"" for c in df.columns]
+    col_str = ", ".join(cols)
+    
+    # Helper for SQL Literal formatting
+    def to_sql_literal(val):
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return "NULL"
+        if isinstance(val, (dict, list)):
+            return "'" + json.dumps(val).replace("'", "''") + "'"
+        if isinstance(val, str):
+            return "'" + val.replace("'", "''") + "'"
+        if isinstance(val, bool):
+            return "TRUE" if val else "FALSE"
+        return str(val)
+
+    batch_size = 100
+    records = df.to_dict(orient='records')
+    
+    for i in range(0, len(records), batch_size):
+        batch = records[i:i+batch_size]
+        values_list = []
+        for rec in batch:
+            row_vals = [to_sql_literal(rec.get(c)) for c in df.columns]
+            values_list.append("(" + ", ".join(row_vals) + ")")
+        
+        insert_stmt = f"INSERT INTO \"{table_name}\" ({col_str})\nVALUES\n"
+        insert_stmt += ",\n".join(values_list)
+        
+        if mode == 'upsert' and pk_field:
+            update_sets = [f"\"{c}\" = EXCLUDED.\"{c}\"" for c in df.columns if c != pk_field]
+            if update_sets:
+                insert_stmt += f"\nON CONFLICT (\"{pk_field}\") DO UPDATE SET\n"
+                insert_stmt += ",\n".join(update_sets)
+            else:
+                insert_stmt += f"\nON CONFLICT (\"{pk_field}\") DO NOTHING"
+        
+        insert_stmt += ";"
+        sql_lines.append(insert_stmt + "\n")
+
+    return "\n".join(sql_lines)
+
+def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callback=None, export_path=None):
     def log(msg, level="info"):
         if gui_callback: gui_callback(msg)
         if level == "info": logger.info(msg)
@@ -103,6 +180,22 @@ def process_data(json_path, table_name, engine, mode, pk_field=None, gui_callbac
 
     log("[*] Inferring SQL schema...")
     dtype_map = analyze_dataframe(df)
+
+    # --- SQL EXPORT MODE ---
+    if export_path:
+        log(f"[*] Exporting SQL Script to: {export_path}...")
+        try:
+            sql_content = generate_sql_script(df, table_name, mode, pk_field)
+            with open(export_path, 'w', encoding='utf-8') as f:
+                f.write(sql_content)
+            log(f"[SUCCESS] SQL Script saved successfully!", "info")
+            return
+        except Exception as e:
+            log(f"[ERROR] SQL Export failed: {e}", "error")
+            raise
+
+    if not engine:
+        raise ValueError("Database Engine is required for direct import mode.")
     
     inspector = inspect(engine)
     table_exists = inspector.has_table(table_name)

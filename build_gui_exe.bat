@@ -20,7 +20,28 @@ call venv_build\Scripts\activate
 echo [*] Installing/Verifying dependencies...
 pip install pyinstaller pandas sqlalchemy psycopg2-binary PyQt6 --quiet
 
-:: 2. SECRETS INITIALIZATION (Interactive Setup with Reconfiguration Option)
+:: 2. BUILD MODE SELECTION
+echo.
+echo ========================================================
+echo   [BUILD MODE SELECTION]
+echo ========================================================
+echo 1. DEVELOPMENT BUILD (with your local database credentials)
+echo 2. PRODUCTION BUILD (clean executable for distribution)
+echo.
+set /p BUILD_MODE="Select build mode (1/2): "
+
+if "!BUILD_MODE!"=="2" goto PRODUCTION_BUILD
+if not "!BUILD_MODE!"=="1" (
+    echo [ERROR] Invalid selection. Defaulting to Development mode.
+    set BUILD_MODE=1
+)
+
+:: ========== DEVELOPMENT MODE ==========
+:DEVELOPMENT_BUILD
+echo.
+echo [MODE] Development Build Selected
+echo ========================================================
+
 if exist ".env" (
     echo.
     echo [*] Found existing .env configuration.
@@ -89,7 +110,25 @@ echo [SUCCESS] Connection verified! Saving .env...
     echo DB_USER=!DBUSER!
     echo DB_PASSWORD=!DBPASS!
 ) > .env
-echo [OK] .env file created successfully.
+echo [OK] .env file created successfully with validated credentials.
+goto SKIP_SETUP
+
+:: ========== PRODUCTION MODE ==========
+:PRODUCTION_BUILD
+echo.
+echo [MODE] Production Build Selected
+echo ========================================================
+echo [*] Generating clean .env template for distribution...
+(
+    echo # Phoenix SQL Importer - Local Configuration
+    echo # Edit these values with your actual database credentials
+    echo DB_HOST=localhost
+    echo DB_PORT=5432
+    echo DB_DATABASE=
+    echo DB_USER=postgres
+    echo DB_PASSWORD=
+) > .env
+echo [OK] Clean .env template created (no validation performed).
 
 :SKIP_SETUP
 

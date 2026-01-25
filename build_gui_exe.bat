@@ -1,6 +1,6 @@
 @echo off
-title Phoenix GUI Compiler v4.9 (Scorched Earth)
-echo [Anya-Corena] Iniciando compilacion MAESTRA v4.9...
+title Phoenix GUI Compiler v5.0 (Gold Master)
+echo [Anya-Corena] Iniciando compilacion v5.0 GOLD...
 echo.
 
 python --version >nul 2>&1
@@ -8,6 +8,19 @@ if %errorlevel% neq 0 (
     echo [ERROR] Falta Python.
     pause
     exit /b
+)
+
+:: 0. SECRETS INITIALIZATION (Local Only)
+if not exist ".env" (
+    echo [*] Generating .env template for local credentials...
+    echo # Phoenix SQL Importer - Local Configuration > .env
+    echo # Edit this file with your real data and restart the app. >> .env
+    echo DB_HOST=localhost >> .env
+    echo DB_PORT=5432 >> .env
+    echo DB_DATABASE=my_database >> .env
+    echo DB_USER=postgres >> .env
+    echo DB_PASSWORD=my_secret_password >> .env
+    echo [OK] .env file created.
 )
 
 :: 1. LIMPIEZA PREVENTIVA

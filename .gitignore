@@ -47,3 +47,6 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Secrets (Local Only)
+.env

@@ -148,11 +148,31 @@ class PhoenixApp(QMainWindow):
         self.current_step = 0
         self.df = None
         self.setup_ui()
+        self.load_local_secrets()
         
         # Add footer at the very bottom
         self.layout.addWidget(self.footer)
         self.update_step_visuals()
         logger.info("GUI Initialized")
+
+    def load_local_secrets(self):
+        """Load credentials from .env if it exists (Local Only)"""
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line and not line.startswith("#"):
+                            key, value = line.split("=", 1)
+                            if key == "DB_HOST": self.host.setText(value)
+                            elif key == "DB_PORT": self.port.setText(value)
+                            elif key == "DB_DATABASE": self.db.setText(value)
+                            elif key == "DB_USER": self.user.setText(value)
+                            elif key == "DB_PASSWORD": self.pw.setText(value)
+                logger.info("UI: Credentials loaded from local .env file")
+            except Exception as e:
+                logger.error(f"UI: Error loading .env: {e}")
 
     def update_step_visuals(self):
         # 🛡️ Hardened Safety Checks: Prevent initialization crashes

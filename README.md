@@ -30,7 +30,8 @@ Phoenix SQL Importer is a professional-grade desktop application that automates 
 - **Duplicate Prevention**: Strict Primary Key validation before import
 - **Visual Schema Mapping**: Interactive table for field selection and type configuration
 - **Real-time Logging**: Integrated debug logging with `phoenix_debug.log`
-- **Connection Validation**: Pre-flight database connectivity testing
+- **Connection Validation**: Robust pre-flight checks (Host, Port, DB, User)
+- **Portable Edition**: Single `.exe` deployment (no installation required)
 
 ---
 
@@ -134,6 +135,7 @@ Phoenix-JSON2SQL-Master/
 │
 ├── phoenix_gui.py          # Main GUI application
 ├── phoenix_importer.py     # Core import/export engine
+├── logger_config.py        # Centralized debug logging system
 ├── sanitize.py             # Security sanitization tool
 ├── resources/              # UI icons and branding
 │   ├── phoenix_icon.ico

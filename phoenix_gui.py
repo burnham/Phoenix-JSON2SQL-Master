@@ -213,9 +213,13 @@ class PhoenixApp(QMainWindow):
             QMainWindow { background-color: #FDFBF7; }
             QLabel { font-family: 'Segoe UI'; font-size: 15px; color: #333; }
             QLabel#Header { font-size: 24px; font-weight: bold; color: #B22222; margin-bottom: 12px; }
-            QLineEdit, QComboBox, QTableWidget {
+            QLineEdit, QTableWidget {
                 background-color: #FFF; color: #000; border: 1px solid #CCC;
                 border-radius: 4px; padding: 8px; font-size: 14px;
+            }
+            QComboBox {
+                background-color: #FFF; color: #000; border: 1px solid #CCC;
+                border-radius: 4px; padding: 2px 8px; font-size: 11px; min-height: 22px;
             }
             QPushButton {
                 background-color: #E0E0E0; border: none; border-radius: 4px;

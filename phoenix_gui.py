@@ -86,7 +86,7 @@ class WorkerThread(QThread):
 class PhoenixApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Phoenix SQL Importer (Pro Edition)")
+        self.setWindowTitle("Phoenix SQL Importer v5.0 (Gold Master)")
         self.setMinimumSize(1000, 750)
         
         icon_path = resource_path("resources/phoenix_icon.ico")

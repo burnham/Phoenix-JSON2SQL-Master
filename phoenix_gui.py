@@ -157,7 +157,12 @@ class PhoenixApp(QMainWindow):
 
     def load_local_secrets(self):
         """Load credentials from .env if it exists (Local Only)"""
-        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(__file__)
+            
+        env_path = os.path.join(base_path, ".env")
         if os.path.exists(env_path):
             try:
                 with open(env_path, "r", encoding="utf-8") as f:

@@ -522,9 +522,22 @@ class PhoenixApp(QMainWindow):
                 QMessageBox.warning(self, "Missing File", "Please select a JSON file to continue.")
                 return
         if self.current_step == 1:
-            # If skipping conn, we allow it. Otherwise warn only if user hasn't tested? 
-            # For now, just allow go next if it's not the final step.
-            pass
+            # Connection validation before advancing
+            if not self.skip_conn.isChecked():
+                # Check if required fields are filled
+                missing = []
+                if not self.host.text().strip(): missing.append("Host")
+                if not self.port.text().strip(): missing.append("Port")
+                if not self.db.text().strip(): missing.append("Database")
+                if not self.user.text().strip(): missing.append("User")
+                
+                if missing:
+                    QMessageBox.warning(
+                        self, 
+                        "Missing Connection Data",
+                        f"Please fill in the following fields:\n- {', '.join(missing)}\n\nA valid database connection is required."
+                    )
+                    return
             
         if self.current_step < 4:
             self.current_step += 1

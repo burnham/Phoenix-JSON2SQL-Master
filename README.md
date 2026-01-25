@@ -10,7 +10,7 @@ Phoenix SQL Importer is a professional-grade desktop application that automates 
 
 ![Phoenix SQL Importer Interface](Docs/Build.png)
 
-*The Phoenix SQL Importer v5.0 interface showing the complete workflow from JSON selection to database execution.*
+*The Phoenix SQL Importer v6.0 Intelligence Suite interface showing the complete workflow from JSON selection to database execution.*
 
 ---
 
@@ -130,6 +130,7 @@ This project evolved through multiple iterations:
 - **v3.0** - SQL Export Engine: Connection-less export mode
 - **v4.x** - UX Evolution: Modern UI polish and watermarking
 - **v5.0** - Stable Release: Production-ready state
+- **v6.0 Intelligence Suite** - Advanced credential management, dual-mode builds, intelligent auto-fill
 
 See full history: [Commits](https://github.com/burnham/Phoenix-JSON2SQL-Master/commits/master)
 

@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
-title Phoenix GUI Compiler v5.0 (Gold Master)
-echo [Anya-Corena] Starting Compilation v5.0 GOLD...
+title Phoenix GUI Compiler v6.0 (Intelligence Suite)
+echo [Anya-Corena] Starting Compilation v6.0 Intelligence Suite...
 echo.
 
 python --version >nul 2>&1
@@ -140,14 +140,14 @@ if exist "dist" rmdir /s /q "dist"
 del /q *.spec >nul 2>&1
 
 :: 4. COMPILATION
-echo [*] Compiling PhoenixImporterGUI_v5.0.exe with embedded credentials...
-pyinstaller --noconfirm --onefile --noconsole --name "PhoenixImporterGUI_v5.0" --icon "resources/phoenix_icon.ico" --add-data "resources;resources" --add-data ".env;." --clean phoenix_gui.py
+echo [*] Compiling PhoenixImporterGUI_v6.0.exe with embedded credentials...
+pyinstaller --noconfirm --onefile --noconsole --name "PhoenixImporterGUI_v6.0" --icon "resources/phoenix_icon.ico" --add-data "resources;resources" --add-data ".env;." --clean phoenix_gui.py
 
 echo [*] Moving executable to root...
-move /Y dist\PhoenixImporterGUI_v5.0.exe . >nul
+move /Y dist\PhoenixImporterGUI_v6.0.exe . >nul
 
 echo.
 echo ========================================================
-echo   [SUCCESS] PhoenixImporterGUI_v5.0.exe GENERATED.
+echo   [SUCCESS] PhoenixImporterGUI_v6.0.exe GENERATED.
 echo ========================================================
 pause

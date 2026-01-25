@@ -86,7 +86,7 @@ class WorkerThread(QThread):
 class PhoenixApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Phoenix SQL Importer v5.0 (Gold Master)")
+        self.setWindowTitle("Phoenix SQL Importer v6.0 (Intelligence Suite)")
         self.setMinimumSize(1000, 750)
         
         icon_path = resource_path("resources/phoenix_icon.ico")
@@ -358,7 +358,8 @@ class PhoenixApp(QMainWindow):
         l4.addWidget(QLabel("Import Configuration", objectName="Header"))
         
         l4.addWidget(QLabel("Target Table Name:"))
-        self.table_name = QLineEdit("[REDACTED_VALUE]")
+        self.table_name = QLineEdit("")
+        self.table_name.setPlaceholderText("Will auto-fill when you load a JSON file")
         l4.addWidget(self.table_name)
         
         l4.addWidget(QLabel("Operation Mode:"))

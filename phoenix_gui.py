@@ -428,6 +428,12 @@ class PhoenixApp(QMainWindow):
                     data = json.load(f)
                 self.df = pd.DataFrame(data)
                 self.preview.setText(json.dumps(data[:2], indent=2))
+                
+                # Auto-fill table name with JSON filename (without extension)
+                filename = os.path.basename(path)
+                table_name_suggestion = os.path.splitext(filename)[0]
+                self.table_name.setText(table_name_suggestion)
+                
                 self.populate_schema()
             except Exception as e:
                 logger.error(f"UI: Error loading JSON: {e}")

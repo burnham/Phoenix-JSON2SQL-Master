@@ -94,14 +94,14 @@ python -c "import psycopg2; psycopg2.connect(host='!DBHOST!', port=int('!DBPORT!
 
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Connection failed!
-    echo Please check your credentials and try again.
+    powershell -Command "Write-Host '[ERROR] CONNECTION FAILED!' -ForegroundColor Red"
+    powershell -Command "Write-Host 'Please check your credentials and try again.' -ForegroundColor Red"
     echo.
     pause
     goto RETRY_SETUP
 )
 
-echo [SUCCESS] Connection verified! Saving .env...
+powershell -Command "Write-Host '[SUCCESS] CONNECTION VERIFIED! SAVING .ENV...' -ForegroundColor Green"
 (
     echo # Phoenix SQL Importer - Local Configuration
     echo DB_HOST=!DBHOST!

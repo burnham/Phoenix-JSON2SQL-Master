@@ -60,7 +60,14 @@ Phoenix SQL Importer is a professional-grade desktop application that automates 
    ```
 
 ### Optional: Build executable
-For a standalone `.exe` (Windows):
+For a standalone `.exe` (Windows), you can use the provided script. 
+
+**What happens when you run `build_gui_exe.bat`:**
+- **Isolation:** It creates a local virtual environment (`venv_build`) to avoid polluting your global Python.
+- **Dependencies:** Installs necessary tools (`pyinstaller`, `pandas`, `sqlalchemy`, etc.) inside that environment.
+- **Compilation:** Uses PyInstaller to bundle everything into a single portable file.
+- **Safety:** No system-wide changes are made; everything stays within the project directory.
+
 ```bash
 build_gui_exe.bat
 ```
@@ -144,7 +151,7 @@ Phoenix-JSON2SQL-Master/
 │   └── linkedin_icon.png
 │
 ├── build_gui_exe.bat       # Executable builder (Windows)
-├── limpiar_gui.bat         # Cleanup script
+├── limpiar_gui.bat         # Project cleanup and maintenance script
 └── README.md               # This file
 ```
 

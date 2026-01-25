@@ -1,60 +1,100 @@
 @echo off
+setlocal enabledelayedexpansion
 title Phoenix GUI Compiler v5.0 (Gold Master)
-echo [Anya-Corena] Iniciando compilacion v5.0 GOLD...
+echo [Anya-Corena] Starting Compilation v5.0 GOLD...
 echo.
 
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Falta Python.
+    echo [ERROR] Python is missing.
     pause
     exit /b
 )
 
-:: 0. SECRETS INITIALIZATION (Local Only)
-if not exist ".env" (
-    echo [*] Generating .env template for local credentials...
-    echo # Phoenix SQL Importer - Local Configuration > .env
-    echo # Edit this file with your real data and restart the app. >> .env
-    echo DB_HOST=localhost >> .env
-    echo DB_PORT=5432 >> .env
-    echo DB_DATABASE=my_database >> .env
-    echo DB_USER=postgres >> .env
-    echo DB_PASSWORD=my_secret_password >> .env
-    echo [OK] .env file created.
+:: 1. VIRTUAL ENVIRONMENT setup
+if not exist "venv_build" (
+    echo [*] Creating build environment...
+    python -m venv venv_build
+)
+call venv_build\Scripts\activate
+echo [*] Installing/Verifying dependencies...
+pip install pyinstaller pandas sqlalchemy psycopg2-binary PyQt6 --quiet
+
+:: 2. SECRETS INITIALIZATION (Interactive Setup with Reconfiguration Option)
+if exist ".env" (
+    echo.
+    echo [*] Found existing .env configuration.
+    set /p RECONFIGURE="Do you want to reconfigure your database settings? (y/n): "
+    if /i "!RECONFIGURE!"=="y" (
+        del .env
+        echo [*] Existing configuration removed. Starting setup...
+    ) else (
+        echo [*] Using existing .env configuration.
+        goto SKIP_SETUP
+    )
 )
 
-:: 1. LIMPIEZA PREVENTIVA
-echo [*] Eliminando rastros antiguos...
+:RETRY_SETUP
+echo.
+echo ========================================================
+echo   [SETUP] DATABASE CONFIGURATION
+echo ========================================================
+echo Let's configure your local database connection.
+
+set /p DBHOST="Enter Host [localhost]: "
+if "!DBHOST!"=="" set DBHOST=localhost
+
+set /p DBPORT="Enter Port [5432]: "
+if "!DBPORT!"=="" set DBPORT=5432
+
+set /p DBNAME="Enter Database Name: "
+set /p DBUSER="Enter User [postgres]: "
+if "!DBUSER!"=="" set DBUSER=postgres
+
+set /p DBPASS="Enter Password: "
+
+echo.
+echo [*] Verifying connection...
+python -c "import psycopg2; psycopg2.connect(host='!DBHOST!', port=int('!DBPORT!'), dbname='!DBNAME!', user='!DBUSER!', password='!DBPASS!').close()"
+
+if !errorlevel! neq 0 (
+    echo.
+    echo [ERROR] Connection failed!
+    echo Please check your credentials and try again.
+    echo.
+    pause
+    goto RETRY_SETUP
+)
+
+echo [SUCCESS] Connection verified! Saving .env...
+(
+    echo # Phoenix SQL Importer - Local Configuration
+    echo DB_HOST=!DBHOST!
+    echo DB_PORT=!DBPORT!
+    echo DB_DATABASE=!DBNAME!
+    echo DB_USER=!DBUSER!
+    echo DB_PASSWORD=!DBPASS!
+) > .env
+echo [OK] .env file created successfully.
+
+:SKIP_SETUP
+
+:: 3. CLEANUP
+echo.
+echo [*] Cleaning old artifacts...
 if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
 del /q *.spec >nul 2>&1
-taskkill /F /IM PhoenixImporterGUI.exe /T >nul 2>&1
 
-:: 2. ENTORNO VIRTUAL
-if not exist "venv_build" (
-    echo [*] Creando entorno de compilacion - Solo la primera vez...
-    python -m venv venv_build
-    call venv_build\Scripts\activate
-    echo [*] Instalando dependencias blindadas...
-    pip install pyinstaller pandas sqlalchemy psycopg2-binary PyQt6
-) else (
-    call venv_build\Scripts\activate
-)
-
-echo.
-echo [*] Compilando PhoenixImporterGUI.exe (Modo Standalone)...
-:: Flags explicados:
-:: --noconfirm: Sobrescribir sin preguntar
-:: --onefile: Todo en un solo .exe
-:: --noconsole: Sin ventana negra de CMD detras
-:: --clean: Limpiar cache de PyInstaller antes de empezar
+:: 4. COMPILATION
+echo [*] Compiling PhoenixImporterGUI_v5.0.exe...
 pyinstaller --noconfirm --onefile --noconsole --name "PhoenixImporterGUI_v5.0" --icon "resources/phoenix_icon.ico" --add-data "resources;resources" --clean phoenix_gui.py
 
-echo [*] Moviendo ejecutable a la raiz...
+echo [*] Moving executable to root...
 move /Y dist\PhoenixImporterGUI_v5.0.exe . >nul
 
 echo.
 echo ========================================================
-echo   [EXITO] PhoenixImporterGUI_v5.0.exe GENERADO.
+echo   [SUCCESS] PhoenixImporterGUI_v5.0.exe GENERATED.
 echo ========================================================
 pause

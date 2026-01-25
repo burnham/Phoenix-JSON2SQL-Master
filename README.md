@@ -62,16 +62,26 @@ Phoenix SQL Importer is a professional-grade desktop application that automates 
 ### Optional: Build executable
 For a standalone `.exe` (Windows), you can use the provided script. 
 
+**🔧 Interactive Setup Wizard:**
+The build script now includes an **intelligent database configuration wizard** that:
+- Prompts for your database credentials interactively
+- **Validates the connection** before saving (using real PostgreSQL connection test)
+- Automatically generates a local `.env` file with your settings
+- Offers a reconfiguration menu if `.env` already exists
+- **Retry loop:** If credentials fail, you can immediately retry without restarting
+
 **What happens when you run `build_gui_exe.bat`:**
-- **Isolation:** It creates a local virtual environment (`venv_build`) to avoid polluting your global Python.
-- **Dependencies:** Installs necessary tools (`pyinstaller`, `pandas`, `sqlalchemy`, etc.) inside that environment.
-- **Compilation:** Uses PyInstaller to bundle everything into a single portable file.
-- **Safety:** No system-wide changes are made; everything stays within the project directory.
+- **Environment Setup:** Creates an isolated virtual environment (`venv_build`)
+- **Dependency Installation:** Installs build tools (`pyinstaller`, `pandas`, `sqlalchemy`, `psycopg2`, `PyQt6`)
+- **Interactive Configuration:** Guides you through database setup with real-time validation
+- **Safety:** No system-wide changes; everything stays within the project directory
+- **Security:** Your `.env` file is automatically protected by `.gitignore`
 
 ```bash
 build_gui_exe.bat
 ```
 
+**After first run:** Your credentials are saved locally. The application will pre-fill connection fields automatically.
 ---
 
 ## 📖 Usage
